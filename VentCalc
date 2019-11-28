@@ -1,6 +1,6 @@
 //------------------------------------------------------------------------
 //
-// Name:    Pairsh
+// Name:    Parish
 //
 // Purpose: Adjust vent positions based on area, read in the variables from
 // the child apps, and output the vent level back to the child app.
