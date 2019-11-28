@@ -1,0 +1,287 @@
+//------------------------------------------------------------------------
+//
+// Name:    Pairsh
+//
+// Purpose: Adjust vent positions based on area
+//
+//------------------------------------------------------------------------
+
+#include <iostream>
+#include <iomanip>
+#include <string>
+#include <stdio.h>
+using namespace std;
+
+// Globals
+const int staticArea = 72;
+const int targetArea = 350;
+const int maxDelta = 5;
+float targetArea_1 = 0;
+float targetArea_2 = 0;
+float targetArea_3 = 0;
+float targetArea_4 = 0;
+float initPrioritySum = 0;
+float initWeightSum = 0;
+float remainAreaSum = 0;
+float ventLevel_1 = 0;
+float finalAreaSum = 0;
+
+float result = 0;
+float totalOpenArea = 0;
+const int totalRooms = 14;
+
+// Structure
+struct roomValues
+{
+	float targetTemp;
+	float currentTemp;
+	int minOpen;
+	int maxOpen;
+	int ventLevel;
+	float ventArea;
+	float tempDif;
+	float initOpen;
+	float initArea;
+	float initPriority;
+	float initWeight;
+	float availArea;
+	float stage1Area;
+	float intSetVent;
+	float intSetArea;
+	float stage2dif;
+	float stage2Priority;
+	float stage2Weight;
+	float stage2AreaAdd;
+	float stage2AreaAdj;
+	float stage2FinalArea;
+	
+};
+
+roomValues rooms[totalRooms];// testing with 14 rooms
+
+// ======================================================================
+// Prototype Function declarations:
+// ======================================================================
+
+void setVentValues(roomValues room[], int size);
+void difference(roomValues room[], int size);
+void initOpen(roomValues room[], int size);
+void stage1Area(roomValues room[], int size);
+float initPriority(roomValues room[], int size);
+float initWeights(roomValues room[], int size);
+float remainingArea(roomValues room[], int size);
+void setVentStage1(roomValues room[], int size);
+void stage2Weight(roomValues room[], int size);
+void setFinalVent(roomValues room[], int size);
+
+
+// ======================================================================
+int main()
+{
+   // Set decimal formatting.
+   cout << fixed << showpoint << setprecision(2);
+
+   // Set default values for testing
+   setVentValues(rooms, totalRooms);
+
+   //Step 1 values
+   difference(rooms, totalRooms);
+   initOpen(rooms, totalRooms);
+   stage1Area(rooms, totalRooms);
+   initPrioritySum = initPriority(rooms, totalRooms);
+   initWeightSum = initWeights(rooms, totalRooms);
+   remainAreaSum = remainingArea(rooms, totalRooms);
+   setVentStage1(rooms, totalRooms);
+
+   //Start Code for using the vents in rooms not calling for heat based on how close they are 
+   //to the target temp, this is only needed when the vent area for rooms calling for heat
+   // are not enough to hit the target area.
+
+   stage2Weight(rooms, totalRooms);
+   setFinalVent(rooms, totalRooms);
+
+
+   //Output the vent level and area for viewing
+   for (int i = 0; i < totalRooms; i++)
+   {
+	   cout << "Vent Level " << rooms[i].ventLevel << " Area " << rooms[i].stage2FinalArea << endl;
+   }
+
+   return 0;
+}
+
+// ======================================================================
+// Functions Definitions:
+// ======================================================================
+
+// Purpose: Initial room values
+// These would come from the child rooms //arbitrary values for now
+void setVentValues(roomValues room[], int size)
+{
+
+	for (int i = 0; i < size; i++)
+	{
+		room[i].ventArea = (38);
+		room[i].minOpen = 0;
+		room[i].maxOpen = 100;
+		room[i].currentTemp = 60.0 + i;
+		room[i].targetTemp = 68.0;
+		room[i].ventLevel = 68.0 + i;
+	}
+
+}
+
+// Purpose: Find difference of temperature
+void difference(roomValues room[], int size)
+{
+	for (int i = 0; i < size; i++)
+	{
+		room[i].tempDif = room[i].targetTemp - room[i].currentTemp;
+	}
+}
+
+// Purpose: Initial Open Value % Min-Max
+void initOpen(roomValues room[], int size)
+{
+	for (int i = 0; i < size; i++)
+	{
+		room[i].initOpen = 100/maxDelta*room[i].tempDif;
+		if (room[i].initOpen > 100)
+			room[i].initOpen = 100;
+		if (room[i].initOpen < 0)
+			room[i].initOpen = 0;
+		room[i].initOpen = (room[i].initOpen * .01 * room[i].maxOpen);
+	}
+}
+
+// Purpose: Initial Open Area: Returns the delta area from target
+void stage1Area(roomValues room[], int size)
+{
+	float totalVentArea = staticArea;
+
+	for (int i = 0; i < size; i++)
+	{
+		room[i].initArea = room[i].ventArea * room[i].initOpen * .01;
+		totalVentArea = room[i].initArea + totalVentArea;
+	}
+	targetArea_1 = (targetArea - totalVentArea);
+}
+
+// Purpose: Initial Priority
+float initPriority(roomValues room[], int size)
+{
+	float prioritySum = 0;
+
+	for (int i = 0; i < size; i++)
+	{
+		room[i].initPriority = 100 - (100 / room[i].targetTemp* room[i].currentTemp);
+		if (room[i].initPriority > 0)
+			room[i].initPriority = room[i].initPriority * (room[i].ventArea - room[i].initArea);
+		else
+			room[i].initPriority = 0;
+
+		prioritySum = prioritySum + room[i].initPriority;
+	}
+
+	return prioritySum;
+}
+
+// Purpose: Initial Room weight: Total should return 100%
+float initWeights(roomValues room[], int size)
+{
+	float total100 = 0;
+
+	for (int i = 0; i < size; i++)
+	{
+		room[i].initWeight = 100/initPrioritySum*room[i].initPriority;
+		total100 = total100 + room[i].initWeight;
+	}
+
+	return total100; //dont really need to return, more for verification
+}
+
+// Purpose: Find the remaining vent area from the rooms that are requesting heat first
+// Return the sum of active vent remaining area
+float remainingArea(roomValues room[], int size)
+{
+	float remainAreaSum = 0;
+
+	for (int i = 0; i < size; i++)
+	{
+		if (room[i].initArea > 0)
+			room[i].availArea = room[i].ventArea - room[i].initArea;
+		else
+			room[i].availArea = 0;
+		
+		remainAreaSum = remainAreaSum + room[i].availArea;
+	}
+	targetArea_2 = targetArea_1 - remainAreaSum;
+	return remainAreaSum;
+}
+
+// Purpose: Initial Room weight: Total should return 100%
+void setVentStage1(roomValues room[], int size)
+{
+	float stage1AreaSum = 0;
+	float addvalue = 0;
+
+	for (int i = 0; i < size; i++)
+	{
+		if (remainAreaSum <= targetArea_1)
+			if (room[i].availArea > 0)
+				addvalue = (100 - room[i].initOpen);
+			else
+				addvalue = 0;
+
+		else
+			addvalue = (100.0 / remainAreaSum * room[i].availArea * targetArea_1 * 0.01 * 100.0 / room[i].ventArea);
+
+
+		room[i].intSetVent = room[i].initOpen + addvalue;
+		room[i].stage1Area = room[i].ventArea * room[i].intSetVent * .01;
+		stage1AreaSum = stage1AreaSum + room[i].stage1Area;
+	}
+	targetArea_3 = targetArea - (stage1AreaSum + staticArea);
+}
+
+// Purpose: Stage 2 non active vent weight: Total should return 100%
+void stage2Weight(roomValues room[], int size)
+{
+	float prioritySum = 0;
+
+	for (int i = 0; i < size; i++)
+	{
+		if (room[i].intSetVent == 0)
+			room[i].stage2dif = room[i].currentTemp - room[i].targetTemp;
+		else
+			room[i].stage2dif = 0;
+
+		if (room[i].stage2dif != 0)
+			room[i].stage2Priority = room[i].ventArea - (100 / room[i].ventArea * room[i].stage2dif);
+		else
+			room[i].stage2Priority = 0;
+
+		prioritySum = prioritySum + room[i].stage2Priority;
+	}
+
+	for (int i = 0; i < size; i++)
+	{
+		room[i].stage2Weight = 100 / prioritySum * room[i].stage2Priority;
+	}
+}
+
+// Purpose: Set Final Vent position
+void setFinalVent(roomValues room[], int size)
+{
+
+	for (int i = 0; i < size; i++)
+	{
+		room[i].stage2AreaAdd = targetArea_3 * room[i].stage2Weight * 0.01;
+		room[i].stage2AreaAdj = 100 / room[i].ventArea * room[i].stage2AreaAdd;
+		room[i].ventLevel = room[i].intSetVent + room[i].stage2AreaAdj;
+		room[i].stage2FinalArea = room[i].ventArea * room[i].ventLevel * 0.01;
+
+		finalAreaSum = finalAreaSum + room[i].stage2FinalArea;
+	}
+	finalAreaSum = (finalAreaSum + staticArea);
+}
