@@ -2,7 +2,8 @@
 //
 // Name:    Pairsh
 //
-// Purpose: Adjust vent positions based on area
+// Purpose: Adjust vent positions based on area, read in the variables from
+// the child apps, and output the vent level back to the child app.
 //
 //------------------------------------------------------------------------
 
@@ -33,11 +34,11 @@ const int totalRooms = 14;
 // Structure
 struct roomValues
 {
-	float targetTemp;
-	float currentTemp;
-	int minOpen;
-	int maxOpen;
-	int ventLevel;
+	float targetTemp; // Input from Child App
+	float currentTemp; // Input from Child App
+	int minOpen; // Input from Child App
+	int maxOpen; // Input from Child App
+	int ventLevel; // Output to Child App
 	float ventArea;
 	float tempDif;
 	float initOpen;
